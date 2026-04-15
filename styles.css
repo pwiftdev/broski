@@ -27,6 +27,7 @@ body.is-loading {
 }
 
 body {
+  position: relative;
   font-family: "Inter", system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
   color: var(--text);
   background: radial-gradient(circle at 20% 20%, #1b2440 0%, transparent 35%),
@@ -34,6 +35,86 @@ body {
     linear-gradient(170deg, var(--bg), var(--bg-2));
   min-height: 100vh;
   overflow-x: hidden;
+}
+
+.bg-pop-layer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  min-height: 100%;
+  z-index: 1;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.bg-pop-item {
+  --pop-tilt: 0deg;
+  position: absolute;
+  margin: 0;
+  padding: 0;
+  font-family: "Anton", sans-serif;
+  font-size: clamp(1.05rem, 3vw, 1.85rem);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: rgba(232, 241, 255, 0.92);
+  text-shadow:
+    0 0 14px rgba(117, 246, 187, 0.55),
+    0 0 36px rgba(83, 233, 255, 0.35),
+    0 2px 0 rgba(5, 8, 18, 0.45);
+  transform: translate(-50%, -50%) scale(0.25) rotate(var(--pop-tilt));
+  opacity: 0;
+  filter: blur(0);
+  animation: bg-pop 4.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+  will-change: transform, opacity, filter;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bg-pop-item {
+    animation: none;
+    opacity: 0.12;
+    transform: translate(-50%, -50%) scale(1) rotate(var(--pop-tilt));
+    filter: none;
+  }
+}
+
+@keyframes bg-pop {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.2) rotate(calc(var(--pop-tilt) - 5deg));
+    filter: blur(0);
+  }
+  10% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.18) rotate(calc(var(--pop-tilt) + 3deg));
+    filter: blur(0);
+  }
+  18% {
+    opacity: 0.95;
+    transform: translate(-50%, -50%) scale(1) rotate(var(--pop-tilt));
+    filter: blur(0);
+  }
+  32% {
+    opacity: 0.88;
+    transform: translate(-50%, -50%) scale(1.04) rotate(var(--pop-tilt));
+    filter: blur(0);
+  }
+  45% {
+    opacity: 0.82;
+    transform: translate(-50%, -50%) scale(1.02) rotate(var(--pop-tilt));
+    filter: blur(0);
+  }
+  70% {
+    opacity: 0.45;
+    transform: translate(-50%, -50%) scale(2.8) rotate(var(--pop-tilt));
+    filter: blur(0.5px);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(8.5) rotate(var(--pop-tilt));
+    filter: blur(4px);
+  }
 }
 
 .scroll-progress {

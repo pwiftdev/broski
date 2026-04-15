@@ -2,6 +2,99 @@ import * as THREE from "three";
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+const BG_POP_PHRASES = [
+  "yo broski",
+  "sup broski",
+  "oooo broski",
+  "broski pls",
+  "my broski",
+  "real broski",
+  "that guy broski",
+  "run it broski",
+  "let's go broski",
+  "no cap broski",
+  "sheesh broski",
+  "W broski",
+  "IYKYK broski",
+  "backup broski",
+  "crew broski",
+  "locked in broski",
+  "say less broski",
+  "bet broski",
+  "respect broski",
+  "energy broski",
+  "main character broski",
+  "always broski",
+  "$broski",
+  "hey broski",
+  "chill broski",
+  "vibes broski"
+];
+
+let bgPopStarted = false;
+
+function syncBgPopLayerHeight() {
+  const layer = document.getElementById("bgPopLayer");
+  if (!layer) return;
+  layer.style.minHeight = `${document.documentElement.scrollHeight}px`;
+}
+
+function startBgPopTexts() {
+  if (bgPopStarted) return;
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    return;
+  }
+  const layer = document.getElementById("bgPopLayer");
+  if (!layer) return;
+  bgPopStarted = true;
+
+  syncBgPopLayerHeight();
+  const onLayout = () => syncBgPopLayerHeight();
+  window.addEventListener("resize", onLayout, { passive: true });
+  window.addEventListener("load", onLayout);
+
+  const maxItems = 32;
+
+  const spawn = () => {
+    syncBgPopLayerHeight();
+    const docHeight = document.documentElement.scrollHeight;
+    const el = document.createElement("span");
+    el.className = "bg-pop-item";
+    el.textContent = BG_POP_PHRASES[Math.floor(Math.random() * BG_POP_PHRASES.length)];
+    el.style.left = `${6 + Math.random() * 88}%`;
+    el.style.top = `${Math.random() * docHeight}px`;
+    el.style.animationDuration = `${3.6 + Math.random() * 2.4}s`;
+    el.style.setProperty("--pop-tilt", `${-12 + Math.random() * 24}deg`);
+    layer.appendChild(el);
+
+    while (layer.children.length > maxItems) {
+      layer.removeChild(layer.firstChild);
+    }
+
+    el.addEventListener(
+      "animationend",
+      () => {
+        if (el.parentNode === layer) {
+          layer.removeChild(el);
+        }
+      },
+      { once: true }
+    );
+  };
+
+  const scheduleNext = () => {
+    window.setTimeout(() => {
+      spawn();
+      scheduleNext();
+    }, 420 + Math.random() * 1600);
+  };
+
+  for (let i = 0; i < 7; i += 1) {
+    window.setTimeout(spawn, i * 140);
+  }
+  scheduleNext();
+}
+
 function getImagePixelData(imagePath, targetDimension) {
   return new Promise((resolve, reject) => {
     const image = new Image();
@@ -41,6 +134,7 @@ async function runParticleLoader() {
   if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
     loader.classList.add("loader-hidden");
     document.body.classList.remove("is-loading");
+    startBgPopTexts();
     return;
   }
 
@@ -50,7 +144,8 @@ async function runParticleLoader() {
   canvasMount.appendChild(renderer.domElement);
 
   const scene = new THREE.Scene();
-  const camera = new THREE.OrthographicCamera();
+  const camera = new THREE.PerspectiveCamera(48, 1, 2, 8000);
+  let camDist = 800;
 
   let rafId;
   let cleanupNeeded = true;
@@ -121,29 +216,29 @@ async function runParticleLoader() {
         const dirX = baseX / len;
         const dirY = baseY / len;
         const entryRadius = viewport.maxDimension * (0.38 + Math.random() * 0.42);
-        const disperseRadius = viewport.maxDimension * (0.72 + Math.random() * 0.9);
 
         introOffsets[b] = dirX * entryRadius + (Math.random() - 0.5) * viewport.width * 0.2;
         introOffsets[b + 1] = dirY * entryRadius + (Math.random() - 0.5) * viewport.height * 0.2;
         introOffsets[b + 2] = (Math.random() - 0.5) * 120;
 
-        disperseOffsets[b] = dirX * disperseRadius + (Math.random() - 0.5) * viewport.width * 0.3;
-        disperseOffsets[b + 1] = dirY * disperseRadius + (Math.random() - 0.5) * viewport.height * 0.3;
-        disperseOffsets[b + 2] = (Math.random() - 0.5) * 220;
+        // Disperse: slight XY jitter (Z rush uses perspective cam distance in animate)
+        disperseOffsets[b] = (Math.random() - 0.5) * viewport.width * 0.05;
+        disperseOffsets[b + 1] = (Math.random() - 0.5) * viewport.height * 0.05;
+        disperseOffsets[b + 2] = (Math.random() - 0.5) * 40;
       }
     };
 
     const recalculateBasePositions = () => {
       const viewport = getViewportMetrics();
       const coverScale = Math.max(viewport.width / pixelData.width, viewport.height / pixelData.height);
+      const vFovRad = (camera.fov * Math.PI) / 180;
+      camDist = viewport.height / (2 * Math.tan(vFovRad / 2));
 
-      camera.left = -viewport.width / 2;
-      camera.right = viewport.width / 2;
-      camera.top = viewport.height / 2;
-      camera.bottom = -viewport.height / 2;
-      camera.near = -1200;
-      camera.far = 1200;
-      camera.position.z = 1;
+      camera.aspect = viewport.width / viewport.height;
+      camera.near = 2;
+      camera.far = camDist * 5;
+      camera.position.set(0, 0, camDist);
+      camera.lookAt(0, 0, 0);
       camera.updateProjectionMatrix();
 
       for (let i = 0; i < count; i += 1) {
@@ -185,8 +280,8 @@ async function runParticleLoader() {
     geometry.computeBoundingSphere();
 
     const material = new THREE.PointsMaterial({
-      size: pointSize,
-      sizeAttenuation: false,
+      size: pointSize * 1.15,
+      sizeAttenuation: true,
       vertexColors: true,
       transparent: true,
       opacity: 1,
@@ -208,15 +303,15 @@ async function runParticleLoader() {
     window.addEventListener("resize", resize);
 
     const timeline = {
-      form: 3200,
-      hold: 1700,
-      disperse: 2400
+      form: 2100,
+      hold: 750,
+      disperse: 1500
     };
     const start = performance.now();
     const totalDuration = timeline.form + timeline.hold + timeline.disperse;
 
     const easeOutCubic = (t) => 1 - (1 - t) ** 3;
-    const easeInQuad = (t) => t * t;
+    const easeInQuint = (t) => t * t * t * t * t;
 
     const animate = (now) => {
       const elapsed = now - start;
@@ -224,6 +319,8 @@ async function runParticleLoader() {
 
       let progress = Math.min(elapsed / timeline.form, 1);
       if (elapsed <= timeline.form) {
+        material.size = pointSize * 1.15;
+        material.opacity = 1;
         const eased = easeOutCubic(progress);
         for (let i = 0; i < count; i += 1) {
           const b = i * 3;
@@ -233,6 +330,8 @@ async function runParticleLoader() {
           positions[b + 2] = introOffsets[b + 2] * (1 - eased);
         }
       } else if (elapsed <= timeline.form + timeline.hold) {
+        material.size = pointSize * 1.15;
+        material.opacity = 1;
         for (let i = 0; i < count; i += 1) {
           const b = i * 3;
           const hover = Math.sin(now * 0.00095 + swirls[i] * 1.6) * 1.2;
@@ -242,19 +341,31 @@ async function runParticleLoader() {
         }
       } else {
         progress = Math.min((elapsed - timeline.form - timeline.hold) / timeline.disperse, 1);
-        const eased = easeInQuad(progress);
-        material.opacity = 1 - eased * 0.92;
+        const rush = easeInQuint(progress);
+        const xyShrink = 1 - rush * 0.93;
+        const zEye = camDist * 0.986 * rush;
+        const fadeStart = 0.8;
+        material.opacity =
+          progress <= fadeStart ? 1 : 1 - (progress - fadeStart) / (1 - fadeStart);
+        material.size = pointSize * 1.15 * (1 + rush * rush * 2.2);
+        const zMax = camDist * 0.99;
         for (let i = 0; i < count; i += 1) {
           const b = i * 3;
-          const swirlDrift = Math.sin(now * 0.0011 + swirls[i] * 2.1) * 18 * eased;
-          positions[b] = basePositions[b] + disperseOffsets[b] * eased + swirlDrift;
-          positions[b + 1] = basePositions[b + 1] + disperseOffsets[b + 1] * eased - swirlDrift * 0.6;
-          positions[b + 2] = disperseOffsets[b + 2] * eased;
+          const streak = Math.sin(now * 0.0014 + swirls[i]) * (1 - rush) * 3;
+          positions[b] = basePositions[b] * xyShrink + disperseOffsets[b] * rush + streak;
+          positions[b + 1] = basePositions[b + 1] * xyShrink + disperseOffsets[b + 1] * rush + streak * 0.55;
+          const zJ = zEye + disperseOffsets[b + 2] * rush * 0.12;
+          positions[b + 2] = Math.min(zJ, zMax);
         }
       }
 
-      points.rotation.y = Math.sin(now * 0.00024) * 0.04;
-      points.rotation.x = Math.cos(now * 0.00019) * 0.018;
+      const disperseProgress =
+        elapsed <= timeline.form + timeline.hold
+          ? 0
+          : Math.min((elapsed - timeline.form - timeline.hold) / timeline.disperse, 1);
+      const rotDamp = 1 - disperseProgress;
+      points.rotation.y = Math.sin(now * 0.00024) * 0.04 * rotDamp;
+      points.rotation.x = Math.cos(now * 0.00019) * 0.018 * rotDamp;
       posAttr.needsUpdate = true;
       renderer.render(scene, camera);
 
@@ -264,17 +375,19 @@ async function runParticleLoader() {
     };
 
     rafId = requestAnimationFrame(animate);
-    await wait(totalDuration + 120);
+    await wait(totalDuration + 60);
 
     window.removeEventListener("resize", resize);
     loader.classList.add("loader-hidden");
-    await wait(700);
+    await wait(420);
     cleanup();
     document.body.classList.remove("is-loading");
+    startBgPopTexts();
   } catch (error) {
     loader.classList.add("loader-hidden");
     document.body.classList.remove("is-loading");
     cleanup();
+    startBgPopTexts();
   }
 }
 
